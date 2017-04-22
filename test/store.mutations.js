@@ -80,8 +80,8 @@ test('SET_PASSWORD immutable', t => {
   t.is(state.password.version, 2);
 });
 
-test('SET_DEFAULT_PASSWORD', t => {
-  const SET_DEFAULT_PASSWORD = mutations[types.SET_DEFAULT_PASSWORD];
+test('SET_DEFAULT_OPTIONS', t => {
+  const SET_DEFAULT_OPTIONS = mutations[types.SET_DEFAULT_OPTIONS];
   const state = {
     defaultPassword: {
       site: '',
@@ -95,7 +95,7 @@ test('SET_DEFAULT_PASSWORD', t => {
       version: 2
     }
   };
-  SET_DEFAULT_PASSWORD(state, {password: {symbols: false, length: 30}});
+  SET_DEFAULT_OPTIONS(state, {options: {symbols: false, length: 30}});
   t.is(state.defaultPassword.length, 30);
   t.false(state.defaultPassword.symbols);
 });
@@ -120,7 +120,7 @@ test('DELETE_PASSWORD', t => {
   t.is(state.passwords.length, 1);
 });
 
-test('DELETE_PASSWORD clean password with default password if same id', t => {
+test('DELETE_PASSWORD replace state.password with state.defaultPassword', t => {
   const DELETE_PASSWORD = mutations[types.DELETE_PASSWORD];
   const state = {
     passwords: [{id: '1', length: 30}, {id: '2', length: 16}],

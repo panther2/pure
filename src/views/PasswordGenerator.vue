@@ -115,11 +115,11 @@
         </div>
       </div>
       <div class="col col-auto">
-        <button class="btn btn-copy btn-secondary"
+        <button class="btn btn-copy btn-secondary hint--top"
                 type="button"
                 v-bind:data-clipboard-text="passwordURL"
-                v-bind:disabled="password.site === ''">
-          <i class="fa fa-lg fa-share-alt pointer" aria-hidden="true"></i>
+                v-if="password.site !== ''">
+          <i class="fa fa-share-alt pointer" aria-hidden="true"></i>
         </button>
         <button type="button" class="btn btn-secondary" v-on:click="showOptions=!showOptions">
           <i class="fa fa-sliders" aria-hidden="true"></i>
@@ -142,10 +142,6 @@
   import message from '../services/message';
   import Awesomplete from 'awesomplete';
 
-  function fetchPasswords(store) {
-    return store.dispatch('getPasswords')
-  }
-
   export default {
     name: 'password-generator-view',
     components: {
@@ -154,19 +150,13 @@
       Options
     },
     computed: mapGetters(['passwords', 'password', 'passwordURL']),
-    preFetch: fetchPasswords,
     beforeMount () {
       const query = this.$route.query;
       if (Object.keys(query).length >= 9) {
         this.$store.dispatch('savePassword', {password: getPasswordFromUrlQuery(query)});
       }
 
-      const id = this.$route.params.id;
-      if (id) {
-        this.$store.dispatch('getPassword', {id});
-      } else {
-        fetchPasswords(this.$store);
-      }
+      this.$store.dispatch('getPasswords');
 
       getSite().then(site => {
         if (site) {
@@ -195,7 +185,7 @@
         fingerprint: '',
         generatedPassword: '',
         cleanTimeout: null,
-        showOptions: false,
+        showOptions: this.$store.getters.optionsDifferentFromDefault,
         generatingPassword: false
       }
     },
@@ -256,7 +246,6 @@
         const masterPassword = this.masterPassword;
 
         if (!site && !login || !masterPassword) {
-          this.showOptions = false;
           message.error(this.$t('SiteLoginMasterPasswordMandatory', 'Site, login, and master password fields are mandatory.'));
           return;
         }
