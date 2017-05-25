@@ -3,15 +3,19 @@
     <div class="form-group row">
       <div class="col-12">
         <div class="inner-addon left-addon">
-          <i class="fa fa-lock"></i>
-          <input id="new-password"
+          <i class="fa fa-user"></i>
+          <input id="email"
                  class="form-control"
-                 name="new-password"
-                 type="password"
-                 autocomplete="new-password"
-                 v-bind:placeholder="$t('New Password')"
-                 v-model="new_password">
+                 name="email"
+                 type="email"
+                 placeholder="Email"
+                 v-model="email">
         </div>
+      </div>
+    </div>
+    <div class="form-group row">
+      <div class="col-12">
+        <encrypt-master-password v-model="newPassword" v-bind:email="email"></encrypt-master-password>
       </div>
     </div>
     <div class="form-group row">
@@ -28,39 +32,44 @@
   import User from '../api/user';
   import {mapActions, mapGetters} from 'vuex';
   import message from '../services/message';
+  import EncryptMasterPassword from '../components/EncryptMasterPassword.vue';
 
   export default {
+    computed: {
+      ...mapGetters(['version'])
+    },
+    components: {
+      EncryptMasterPassword
+    },
     data() {
       return {
-        new_password: ''
+        email: '',
+        newPassword: ''
       };
     },
     methods: {
       resetPasswordConfirm(){
-        if (!this.new_password) {
-          message.success($t('PasswordResetRequired', 'A password is required'));
+        if (!this.newPassword) {
+          message.error(this.$t('PasswordResetRequired', 'A password is required'));
           return;
         }
         User
           .confirmResetPassword({
             uid: this.$route.params.uid,
             token: this.$route.params.token,
-            new_password: this.new_password
+            newPassword: this.newPassword
           })
           .then(() => {
-            message.success($t('PasswordResetSuccessful', 'Your password was reset successfully.'));
+            message.success(this.$t('PasswordResetSuccessful', 'Your password was reset successfully.'));
           })
           .catch(err => {
             if (err.response.status === 400) {
-              message.error($t('ResetLinkExpired', 'This password reset link has expired.'));
+              message.error(this.$t('ResetLinkExpired', 'This password reset link has expired.'));
             } else {
               message.displayGenericError();
             }
           });
       }
-    },
-    computed: {
-      ...mapGetters(['version'])
-    },
+    }
   }
 </script>

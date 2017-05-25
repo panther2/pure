@@ -3,33 +3,6 @@
     font-family: Consolas, Menlo, Monaco, Lucida Console, Liberation Mono, DejaVu Sans Mono, Bitstream Vera Sans Mono, Courier New, monospace, sans-serif;
   }
 
-  .inner-addon i {
-    position: absolute;
-    padding: 10px;
-    pointer-events: none;
-    z-index: 10;
-  }
-
-  .inner-addon {
-    position: relative;
-  }
-
-  .left-addon i {
-    left: 0;
-  }
-
-  .right-addon i {
-    right: 0;
-  }
-
-  .left-addon input {
-    padding-left: 30px;
-  }
-
-  .right-addon input {
-    padding-right: 30px;
-  }
-
   div.awesomplete {
     display: block;
   }
@@ -41,8 +14,8 @@
 <template>
   <form id="password-generator">
     <div class="form-group">
+      <label for="site" class="sr-only">{{ $t('Site') }}</label>
       <div class="inner-addon left-addon">
-        <label for="site" class="sr-only">{{ $t('Site') }}</label>
         <i class="fa fa-globe"></i>
         <input id="site"
                name="site"
@@ -57,8 +30,8 @@
     </div>
     <remove-auto-complete></remove-auto-complete>
     <div class="form-group">
+      <label for="login" class="sr-only">{{ $t('Login') }}</label>
       <div class="inner-addon left-addon">
-        <label for="login" class="sr-only">{{ $t('Login') }}</label>
         <i class="fa fa-user"></i>
         <input id="login"
                name="login"
@@ -76,24 +49,29 @@
       <master-password ref="masterPassword" v-model="masterPassword"
                        :keyupEnter="generatePassword"></master-password>
     </div>
-    <div class="form-group row justify-content-between no-gutters" v-bind:class="{'mb-0':showOptions===false}">
-      <div class="col col-auto" v-show="!generatedPassword">
-        <div style="display: inline-block">
-          <button type="button" class="btn" v-on:click="generatePassword"
-                  v-bind:class="{ 'btn-warning': password.version===1, 'btn-primary': password.version===2 }">
-            <span v-if="!generatingPassword">{{ $t('Generate') }}</span>
-            <span v-if="generatingPassword">{{ $t('Generating') }}...</span>
-          </button>
-        </div>
+    <div class="form-group"
+         v-bind:class="{ 'mb-0': !showOptions }">
+      <div v-show="!passwordGenerated">
+        <button type="button"
+                class="btn"
+                v-on:click="generatePassword"
+                v-bind:class="{ 'btn-warning': password.version===1, 'btn-primary': password.version===2 }">
+          {{ $t('Generate') }}
+        </button>
+        <button type="button"
+                class="btn btn-secondary pull-right"
+                v-show="!passwordGenerated"
+                v-on:click="showOptions=!showOptions">
+          <i class="fa fa-sliders" aria-hidden="true"></i>
+        </button>
       </div>
-      <div class="col-8" v-show="generatedPassword">
+      <div class="btn-group" v-show="passwordGenerated">
         <div class="input-group">
           <span class="input-group-btn">
             <button id="copyPasswordButton"
-                    class="btn btn-copy"
+                    class="btn"
                     type="button"
-                    data-clipboard-text=""
-                    ref="copyPasswordButton"
+                    v-on:click="copyPassword()"
                     v-bind:class="{ 'btn-warning': password.version===1, 'btn-primary': password.version===2 }">
               <i class="fa fa-clipboard" aria-hidden="true"></i>
             </button>
@@ -102,28 +80,32 @@
                  type="password"
                  class="form-control"
                  tabindex="-1"
-                 ref="generatedPassword"
-                 v-bind:value="generatedPassword"
-                 v-bind:class="{ 'btn-outline-warning': password.version===1, 'btn-outline-primary': password.version===2 }">
+                 ref="passwordGenerated"
+                 v-bind:value="passwordGenerated">
           <span class="input-group-btn">
-            <button id="revealGeneratedPassword" type="button" class="btn"
-                    v-on:click="togglePasswordType($refs.generatedPassword)"
-                    v-bind:class="{ 'btn-outline-warning': password.version===1, 'btn-outline-primary': password.version===2 }">
+            <button id="revealGeneratedPassword"
+                    type="button"
+                    class="btn btn-secondary"
+                    v-on:click="togglePasswordType($refs.passwordGenerated)">
               <i class="fa fa-eye" aria-hidden="true"></i>
             </button>
           </span>
+          <span class="input-group-btn">
+            <button id="sharePasswordProfileButton"
+                    type="button"
+                    class="btn btn-secondary"
+                    v-on:click="sharePasswordProfile()">
+              <i class="fa fa-share-alt pointer" aria-hidden="true"></i>
+            </button>
+          </span>
+          <span class="input-group-btn">
+            <button type="button"
+                    class="btn btn-secondary"
+                    v-on:click="showOptions=!showOptions">
+              <i class="fa fa-sliders" aria-hidden="true"></i>
+            </button>
+          </span>
         </div>
-      </div>
-      <div class="col col-auto">
-        <button class="btn btn-copy btn-secondary"
-                type="button"
-                v-bind:data-clipboard-text="passwordURL"
-                v-if="password.site !== ''">
-          <i class="fa fa-share-alt pointer" aria-hidden="true"></i>
-        </button>
-        <button type="button" class="btn btn-secondary" v-on:click="showOptions=!showOptions">
-          <i class="fa fa-sliders" aria-hidden="true"></i>
-        </button>
       </div>
     </div>
     <options :password="password" v-on:optionsUpdated="optionsUpdated" v-if="showOptions"></options>
@@ -133,8 +115,7 @@
 <script type="text/ecmascript-6">
   import LessPass from 'lesspass';
   import {mapGetters} from 'vuex';
-  import Clipboard from 'clipboard';
-  import {getSite, getPasswordFromUrlQuery} from '../services/url-parser';
+  import copy from 'copy-text-to-clipboard';
   import RemoveAutoComplete from '../components/RemoveAutoComplete.vue';
   import MasterPassword from '../components/MasterPassword.vue';
   import Options from '../components/Options.vue';
@@ -151,28 +132,9 @@
     },
     computed: mapGetters(['passwords', 'password', 'passwordURL']),
     beforeMount () {
-      const query = this.$route.query;
-      if (Object.keys(query).length >= 9) {
-        this.$store.dispatch('savePassword', {password: getPasswordFromUrlQuery(query)});
-      }
-
       this.$store.dispatch('getPasswords');
-
-      getSite().then(site => {
-        if (site) {
-          this.$store.dispatch('loadPasswordForSite', site);
-        }
-      });
-
-      const clipboard = new Clipboard('.btn-copy');
-      clipboard.on('success', event => {
-        if (event.text) {
-          showTooltip(event.trigger, this.$t('Copied', 'copied !'));
-          setTimeout(() => {
-            this.cleanFormInSeconds(10);
-          }, 2000);
-        }
-      });
+      this.$store.dispatch('getSite');
+      this.$store.dispatch('getPasswordFromUrlQuery', {query: this.$route.query});
     },
     mounted(){
       setTimeout(() => {
@@ -183,10 +145,9 @@
       return {
         masterPassword: '',
         fingerprint: '',
-        generatedPassword: '',
+        passwordGenerated: '',
         cleanTimeout: null,
-        showOptions: this.$store.getters.optionsDifferentFromDefault,
-        generatingPassword: false
+        showOptions: this.$store.getters.optionsDifferentFromDefault
       }
     },
     watch: {
@@ -212,7 +173,7 @@
       'password.login': function() {
         this.cleanErrors();
       },
-      'generatedPassword': function() {
+      'passwordGenerated': function() {
         this.cleanFormInSeconds(30);
       },
       'masterPassword': function() {
@@ -230,13 +191,13 @@
       },
       cleanErrors(){
         clearTimeout(this.cleanTimeout);
-        this.generatedPassword = '';
+        this.passwordGenerated = '';
       },
-      cleanFormInSeconds(seconds){
+      cleanFormInSeconds(seconds = 15){
         clearTimeout(this.cleanTimeout);
         this.cleanTimeout = setTimeout(() => {
           this.masterPassword = '';
-          this.generatedPassword = '';
+          this.passwordGenerated = '';
           this.fingerprint = '';
         }, 1000 * seconds);
       },
@@ -250,7 +211,6 @@
           return;
         }
 
-        this.generatingPassword = true;
         this.cleanErrors();
         this.fingerprint = this.masterPassword;
 
@@ -263,12 +223,10 @@
           counter: this.password.counter,
           version: this.password.version,
         };
-        return LessPass.generatePassword(site, login, masterPassword, passwordProfile).then(generatedPassword => {
-          this.generatingPassword = false;
-          this.generatedPassword = generatedPassword;
+        return LessPass.generatePassword(site, login, masterPassword, passwordProfile).then(passwordGenerated => {
+          this.passwordGenerated = passwordGenerated;
           this.$store.dispatch('savePassword', {password: this.password});
           this.$store.dispatch('passwordGenerated');
-          window.document.getElementById('copyPasswordButton').setAttribute('data-clipboard-text', generatedPassword);
         });
       },
       optionsUpdated(options){
@@ -281,6 +239,34 @@
         const login = this.$refs.login;
         const masterPassword = this.$refs.masterPassword.$refs.password;
         site.value ? (login.value ? masterPassword.focus() : login.focus()) : site.focus();
+      },
+      copyPassword(){
+        const copied = copy(this.passwordGenerated);
+        if (copied) {
+          showTooltip(document.getElementById('copyPasswordButton'), this.$t('Copied', 'copied !'));
+          setTimeout(() => {
+            this.cleanFormInSeconds();
+          }, 2000);
+        } else {
+          message.warning(this.$t('SorryCopy', 'We are sorry the copy only works on modern browsers'))
+        }
+      },
+      sharePasswordProfile(){
+        const copied = copy(this.passwordURL);
+        if (copied) {
+          const copySuccessMessage = this.$t('PasswordProfileCopied', 'Your password profile has been copied');
+          showTooltip(
+            document.getElementById('sharePasswordProfileButton'),
+            copySuccessMessage,
+            'hint--top-left'
+          );
+          setTimeout(() => {
+            this.cleanFormInSeconds();
+          }, 2000);
+        }
+        else {
+          message.warning(this.$t('SorryCopy', 'We are sorry the copy only works on modern browsers'))
+        }
       }
     }
   }
